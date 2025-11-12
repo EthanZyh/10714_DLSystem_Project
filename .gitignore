@@ -1,0 +1,9 @@
+__pycache__/
+*.so
+/data/
+build/
+/commands.sh
+/hw4.ipynb
+.pytest_cache/
+
+
