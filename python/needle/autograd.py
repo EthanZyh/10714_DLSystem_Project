@@ -4,6 +4,7 @@ from .backend_numpy import Device, all_devices
 from typing import List, Optional, NamedTuple, Tuple, Union, Dict
 from collections import namedtuple
 import numpy
+from needle.sparse import SparseCOO2D
 
 from needle import init
 
@@ -364,6 +365,84 @@ class Tensor(Value):
 
     __radd__ = __add__
     __rmul__ = __mul__
+
+
+# [SPARSE] Sparse Tensor class
+class SparseTensor(Value):
+    """Tensor wrapping sparse COO matrix data"""
+    
+    def __init__(self, row_indices, col_indices, values, shape, 
+                 device=None, requires_grad=False):
+        """
+        Create sparse tensor from COO format
+        
+        Args:
+            row_indices: array-like, row indices (will convert to int32)
+            col_indices: array-like, column indices (will convert to int32)
+            values: array-like, values (will convert to float32)
+            shape: (nrows, ncols)
+            device: device to store data on
+            requires_grad: whether to track gradients
+        """
+        from .sparse import NDArrayInt32, SparseCOO2D
+        
+        device = device if device else default_device()
+        
+        # Convert to device arrays
+        if not isinstance(row_indices, NDArrayInt32):
+            row_indices = NDArrayInt32.make_from_numpy(
+                numpy.array(row_indices, dtype=numpy.int32), device
+            )
+        if not isinstance(col_indices, NDArrayInt32):
+            col_indices = NDArrayInt32.make_from_numpy(
+                numpy.array(col_indices, dtype=numpy.int32), device
+            )
+        if not isinstance(values, NDArray):
+            values = Tensor._array_from_numpy(
+                numpy.array(values, dtype=numpy.float32), device, "float32"
+            )
+        
+        # Create SparseCOO2D
+        sparse_data = SparseCOO2D(row_indices, col_indices, values, shape)
+        
+        self._init(None, [], cached_data=sparse_data, requires_grad=requires_grad)
+    
+    @staticmethod
+    def make_from_numpy(row_np, col_np, val_np, shape, device=None):
+        """Convenience constructor from numpy arrays"""
+        device = device if device else default_device()
+        sparse_data = SparseCOO2D.make(row_np, col_np, val_np, shape, device)
+        
+        tensor = SparseTensor.__new__(SparseTensor)
+        tensor._init(None, [], cached_data=sparse_data, requires_grad=False)
+        return tensor
+    
+    @property
+    def shape(self):
+        return self.realize_cached_data().shape
+    
+    @property
+    def nnz(self):
+        """Number of non-zero elements"""
+        return self.realize_cached_data().nnz
+    
+    @property
+    def device(self):
+        return self.realize_cached_data().device
+    
+    def to_dense(self):
+        """Convert to dense Tensor"""
+        return needle.ops.sparse_to_dense(self)
+    
+    def __matmul__(self, other):
+        """Sparse @ Dense matrix multiplication"""
+        if isinstance(other, SparseTensor):
+            raise NotImplementedError("Sparse @ Sparse not yet implemented")
+        return needle.ops.sparse_dense_matmul(self, other)
+    
+    def __repr__(self):
+        return f"SparseTensor(shape={self.shape}, nnz={self.nnz}, device={self.device})"
+
 
 def compute_gradient_of_variables(output_tensor, out_grad):
     """Take gradient of output node with respect to each node in node_list.

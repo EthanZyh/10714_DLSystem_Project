@@ -1,3 +1,4 @@
+// ndarray_backend_cpu.cc 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -387,6 +388,78 @@ void ReduceSum(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
   /// END SOLUTION
 }
 
+// [SPARSE] Integer array for storing sparse indices
+struct AlignedArrayInt32 {
+  AlignedArrayInt32(const size_t size) {
+    int ret = posix_memalign((void**)&ptr, ALIGNMENT, size * sizeof(int32_t));
+    if (ret != 0) throw std::bad_alloc();
+    this->size = size;
+  }
+  ~AlignedArrayInt32() { free(ptr); }
+  size_t ptr_as_int() { return (size_t)ptr; }
+  int32_t* ptr;
+  size_t size;
+};
+
+// [SPARSE] Sparse-dense matrix multiplication: sparse @ dense = out
+void SparseDenseMatMul(
+    const AlignedArrayInt32& row_indices,
+    const AlignedArrayInt32& col_indices,
+    const AlignedArray& values,
+    const AlignedArray& dense,
+    AlignedArray* out,
+    uint32_t sparse_rows,
+    uint32_t sparse_cols,
+    uint32_t dense_cols
+) {
+  /**
+   * Multiply sparse COO matrix by dense matrix
+   * 
+   * Args:
+   *   row_indices: int32 array of row indices (size nnz)
+   *   col_indices: int32 array of column indices (size nnz)
+   *   values: float array of values (size nnz)
+   *   dense: dense matrix (sparse_cols x dense_cols)
+   *   out: output matrix (sparse_rows x dense_cols)
+   */
+  std::memset(out->ptr, 0, out->size * ELEM_SIZE);
+  
+  size_t nnz = row_indices.size;
+  for (size_t idx = 0; idx < nnz; ++idx) {
+    int32_t i = row_indices.ptr[idx];
+    int32_t j = col_indices.ptr[idx];
+    float val = values.ptr[idx];
+    
+    // Multiply sparse element with corresponding row in dense
+    for (uint32_t k = 0; k < dense_cols; ++k) {
+      out->ptr[i * dense_cols + k] += val * dense.ptr[j * dense_cols + k];
+    }
+  }
+}
+
+// [SPARSE] Convert COO sparse to dense
+void SparseToDense(
+    const AlignedArrayInt32& row_indices,
+    const AlignedArrayInt32& col_indices,
+    const AlignedArray& values,
+    AlignedArray* out,
+    uint32_t nrows,
+    uint32_t ncols
+) {
+  /**
+   * Convert sparse COO matrix to dense
+   */
+  std::memset(out->ptr, 0, out->size * ELEM_SIZE);
+  
+  size_t nnz = row_indices.size;
+  for (size_t idx = 0; idx < nnz; ++idx) {
+    int32_t i = row_indices.ptr[idx];
+    int32_t j = col_indices.ptr[idx];
+    float val = values.ptr[idx];
+    out->ptr[i * ncols + j] = val;
+  }
+}
+
 }  // namespace cpu
 }  // namespace needle
 
@@ -403,6 +476,12 @@ PYBIND11_MODULE(ndarray_backend_cpu, m) {
       .def("ptr", &AlignedArray::ptr_as_int)
       .def_readonly("size", &AlignedArray::size);
 
+  // [SPARSE] Integer array class
+  py::class_<AlignedArrayInt32>(m, "ArrayInt32")
+      .def(py::init<size_t>(), py::return_value_policy::take_ownership)
+      .def("ptr", &AlignedArrayInt32::ptr_as_int)
+      .def_readonly("size", &AlignedArrayInt32::size);
+
   // return numpy array (with copying for simplicity, otherwise garbage
   // collection is a pain)
   m.def("to_numpy", [](const AlignedArray& a, std::vector<size_t> shape,
@@ -417,6 +496,18 @@ PYBIND11_MODULE(ndarray_backend_cpu, m) {
   m.def("from_numpy", [](py::array_t<scalar_t> a, AlignedArray* out) {
     std::memcpy(out->ptr, a.request().ptr, out->size * ELEM_SIZE);
   });
+
+  // [SPARSE] Integer array numpy conversions
+  m.def("to_numpy_int32", [](const AlignedArrayInt32& a, std::vector<size_t> shape) {
+    return py::array_t<int32_t>(shape, a.ptr);
+  });
+  
+  m.def("from_numpy_int32", [](py::array_t<int32_t> a, AlignedArrayInt32* out) {
+    std::memcpy(out->ptr, a.request().ptr, out->size * sizeof(int32_t));
+  });
+
+  m.def("sparse_dense_matmul", SparseDenseMatMul);
+  m.def("sparse_to_dense", SparseToDense);
 
   m.def("fill", Fill);
   m.def("compact", Compact);
