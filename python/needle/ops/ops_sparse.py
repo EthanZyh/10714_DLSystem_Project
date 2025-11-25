@@ -75,6 +75,10 @@ class SparseDenseMatMul(TensorOp):
         # Gradient w.r.t sparse values not implemented yet (return None)
         return None, grad_dense
 
+def spmm(sparse_tensor, dense_tensor):
+    """Convenience function for sparse @ dense"""
+    return SparseDenseMatMul()(sparse_tensor, dense_tensor)
+
 
 # [SPARSE] Convert sparse to dense
 class SparseToDense(TensorOp):
