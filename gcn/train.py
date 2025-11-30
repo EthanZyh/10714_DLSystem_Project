@@ -47,7 +47,7 @@ if args.cuda:
 # Load data
 device = ndl.cuda() if args.cuda else ndl.cpu()
 adj, features, labels, idx_train, idx_val, idx_test = load_data("data/cora/")
-adj = ndl.autograd.SparseTensor.make_from_numpy(adj.row, adj.col, adj.data.astype(np.float32), shape=adj.shape, device=device)
+adj = ndl.autograd.SparseTensor(adj.row, adj.col, adj.data.astype(np.float32), shape=adj.shape, device=device)
 features = ndl.Tensor(features, device=device, dtype="float32", requires_grad=False)
 labels = ndl.Tensor(labels, device=device, dtype="float32", requires_grad=False)
 train_mask = make_mask(idx_train, labels.shape[0], device)
@@ -81,7 +81,6 @@ def train(epoch):
     output = model(features, adj)
     loss_train, loss_val, loss_test = loss_module(output, labels, (train_mask, val_mask, test_mask))
     acc_train, acc_val, acc_test = masked_accuracy(output, labels, (train_mask, val_mask, test_mask))
-    breakpoint()
     loss_train.backward()
     optimizer.step()
 
@@ -92,9 +91,9 @@ def train(epoch):
         output = model(features, adj)
 
     print('Epoch: {:04d}'.format(epoch+1),
-          'loss_train: {:.4f}'.format(loss_train.item()),
+          'loss_train: {:.4f}'.format(loss_train.numpy().item()),
           'acc_train: {:.4f}'.format(acc_train.item()),
-          'loss_val: {:.4f}'.format(loss_val.item()),
+          'loss_val: {:.4f}'.format(loss_val.numpy().item()),
           'acc_val: {:.4f}'.format(acc_val.item()),
           'time: {:.4f}s'.format(time.time() - t))
 
@@ -105,7 +104,7 @@ def test():
     loss_test = loss_module(output, labels, (train_mask, val_mask, test_mask))[2]
     acc_test = masked_accuracy(output, labels, (train_mask, val_mask, test_mask))[2]
     print("Test set results:",
-          "loss= {:.4f}".format(loss_test.item()),
+          "loss= {:.4f}".format(loss_test.numpy().item()),
           "accuracy= {:.4f}".format(acc_test.item()))
 
 

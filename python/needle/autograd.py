@@ -491,6 +491,8 @@ def find_topo_sort(node_list: List[Value]) -> List[Value]:
 def topo_sort_dfs(node, visited, topo_order):
     """Post-order DFS"""
     ### BEGIN YOUR SOLUTION
+    if not node.requires_grad:
+      return
     if node in visited:
       return 
     visited.add(node)
