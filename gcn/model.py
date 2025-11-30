@@ -2,7 +2,7 @@ from typing import List, Callable, Any
 from needle.autograd import Tensor
 from needle import ops
 from needle import nn
-from gcn.layers import GraphConvolution
+from layers import GraphConvolution
 
 class GCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout):
@@ -15,5 +15,5 @@ class GCN(nn.Module):
         x = ops.relu(self.gc1(x, adj))
         x = self.dropout(x)
         x = self.gc2(x, adj)
-        return ops.logsoftmax(x, dim=1)
+        return x
     

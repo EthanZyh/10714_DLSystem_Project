@@ -25,6 +25,7 @@ class GraphConvolution(Module):
             ))
         if bias:
             self.bias = Parameter(init.rand(
+                1,
                 self.out_features,
                 low=-1.0 / math.sqrt(out_features),
                 high=1.0 / math.sqrt(out_features),
@@ -39,7 +40,7 @@ class GraphConvolution(Module):
         support = ops.matmul(input, self.weight)
         output = ops.spmm(adj, support)
         if self.bias is not None:
-            return output + self.bias
+            return output + self.bias.broadcast_to(output.shape)
         else:
             return output
 

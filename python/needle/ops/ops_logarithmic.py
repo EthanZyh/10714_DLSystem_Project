@@ -10,8 +10,8 @@ from ..backend_selection import array_api, BACKEND
 class LogSoftmax(TensorOp):
     def compute(self, Z: NDArray) -> NDArray:
         ### BEGIN YOUR SOLUTION
-        Z -= Z.max(-1, keepdims=True)
-        return Z - array_api.log(array_api.exp(Z).sum(-1, keepdims=True))
+        Z -= Z.max(len(Z.shape)-1, keepdims=True).broadcast_to(Z.shape)
+        return Z - array_api.log(array_api.exp(Z).sum(len(Z.shape)-1, keepdims=True).broadcast_to(Z.shape))
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad: Tensor, node: Tensor):

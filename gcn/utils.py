@@ -2,13 +2,13 @@ import numpy as np
 import scipy.sparse as sp
 
 
-def encode_onehot(labels):
+def encode_labels(labels):
     classes = set(labels)
-    classes_dict = {c: np.identity(len(classes))[i, :] for i, c in
+    classes_dict = {c: i for i, c in
                     enumerate(classes)}
-    labels_onehot = np.array(list(map(classes_dict.get, labels)),
+    labels = np.array(list(map(classes_dict.get, labels)),
                              dtype=np.int32)
-    return labels_onehot
+    return labels
 
 
 def load_data(path="../data/cora/", dataset="cora"):
@@ -18,7 +18,7 @@ def load_data(path="../data/cora/", dataset="cora"):
     idx_features_labels = np.genfromtxt("{}{}.content".format(path, dataset),
                                         dtype=np.dtype(str))
     features = sp.csr_matrix(idx_features_labels[:, 1:-1], dtype=np.float32)
-    labels = encode_onehot(idx_features_labels[:, -1])
+    labels = encode_labels(idx_features_labels[:, -1])
 
     # build graph
     idx = np.array(idx_features_labels[:, 0], dtype=np.int32)
@@ -42,13 +42,11 @@ def load_data(path="../data/cora/", dataset="cora"):
     idx_test = range(500, 1500)
 
     features = np.array(features.todense())
-    labels = labels.astype(np.float32)
     adj = adj.tocoo()
-    row, col, data = adj.row, adj.col, adj.data.astype(np.float32)
     idx_train = np.array(idx_train, dtype=np.int32)
     idx_val = np.array(idx_val, dtype=np.int32)
     idx_test = np.array(idx_test, dtype=np.int32)
-    return (row, col, data), features, labels, idx_train, idx_val, idx_test
+    return adj, features, labels, idx_train, idx_val, idx_test
 
 
 def normalize(mx):
@@ -61,12 +59,10 @@ def normalize(mx):
     return mx
 
 
-def accuracy(output, labels):
-    preds = output.max(1)[1].type_as(labels)
-    correct = preds.eq(labels).double()
-    correct = correct.sum()
-    return correct / len(labels)
-
+def masked_accuracy(output, labels, masks):
+    preds = np.argmax(output.numpy(), axis=1)
+    correct = preds == labels.numpy().astype(int)
+    return tuple(np.sum(correct * mask.numpy()) / np.sum(mask.numpy()) for mask in masks)
 
 if __name__ == '__main__':
     load_data(path="data/cora/")

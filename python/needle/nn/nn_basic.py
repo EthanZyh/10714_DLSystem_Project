@@ -148,6 +148,19 @@ class SoftmaxLoss(Module):
         ### END YOUR SOLUTION
 
 
+class MaskedSoftmaxLoss(Module):
+    """
+    Masked softmax loss for handling multiple masks.
+    """
+    def forward(self, logits: Tensor, y: Tensor, masks: tuple[Tensor]) -> Tensor:
+        N, C = logits.shape
+        log_norm = ops.logsumexp(logits, axes=(1,))
+        y_encoded = init.one_hot(C, y, device=logits.device, dtype=logits.dtype)
+        correct_scores = ops.summation(logits * y_encoded, axes=(1,)) 
+        losses = log_norm - correct_scores
+        return tuple(ops.summation(losses * mask) / ops.summation(mask) for mask in masks)
+
+
 class BatchNorm1d(Module):
     def __init__(self, dim: int, eps: float = 1e-5, momentum: float = 0.1, device: Any | None = None, dtype: str = "float32") -> None:
         super().__init__()
