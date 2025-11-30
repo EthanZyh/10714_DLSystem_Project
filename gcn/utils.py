@@ -19,9 +19,6 @@ def load_data(path="../data/cora/", dataset="cora"):
                                         dtype=np.dtype(str))
     features = sp.csr_matrix(idx_features_labels[:, 1:-1], dtype=np.float32)
     labels = encode_onehot(idx_features_labels[:, -1])
-    #print(idx_features_labels, '\n')
-    #print(features, '\n')
-    #print(labels, '\n')
 
     # build graph
     idx = np.array(idx_features_labels[:, 0], dtype=np.int32)
@@ -33,7 +30,6 @@ def load_data(path="../data/cora/", dataset="cora"):
     adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
                         shape=(labels.shape[0], labels.shape[0]),
                         dtype=np.float32)
-    #print('adj, \n', adj, '\n' )
 
     # build symmetric adjacency matrix
     adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
@@ -45,15 +41,14 @@ def load_data(path="../data/cora/", dataset="cora"):
     idx_val = range(200, 500)
     idx_test = range(500, 1500)
 
-    features = torch.FloatTensor(np.array(features.todense()))
-    labels = torch.LongTensor(np.where(labels)[1])
-    adj = sparse_mx_to_torch_sparse_tensor(adj)
-
-    idx_train = torch.LongTensor(idx_train)
-    idx_val = torch.LongTensor(idx_val)
-    idx_test = torch.LongTensor(idx_test)
-
-    return adj, features, labels, idx_train, idx_val, idx_test
+    features = np.array(features.todense())
+    labels = labels.astype(np.float32)
+    adj = adj.tocoo()
+    row, col, data = adj.row, adj.col, adj.data.astype(np.float32)
+    idx_train = np.array(idx_train, dtype=np.int32)
+    idx_val = np.array(idx_val, dtype=np.int32)
+    idx_test = np.array(idx_test, dtype=np.int32)
+    return (row, col, data), features, labels, idx_train, idx_val, idx_test
 
 
 def normalize(mx):
@@ -71,16 +66,6 @@ def accuracy(output, labels):
     correct = preds.eq(labels).double()
     correct = correct.sum()
     return correct / len(labels)
-
-
-def sparse_mx_to_torch_sparse_tensor(sparse_mx):
-    """Convert a scipy sparse matrix to a torch sparse tensor."""
-    sparse_mx = sparse_mx.tocoo().astype(np.float32)
-    indices = torch.from_numpy(
-        np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
-    values = torch.from_numpy(sparse_mx.data)
-    shape = torch.Size(sparse_mx.shape)
-    return torch.sparse.FloatTensor(indices, values, shape)
 
 
 if __name__ == '__main__':
